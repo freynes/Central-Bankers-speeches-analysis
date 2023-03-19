@@ -55,7 +55,7 @@ library(openai)
 library(jsonlite)
 
 Sys.setenv(
-    OPENAI_API_KEY = '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'
+    OPENAI_API_KEY = '' #add your API key here
 )
 
 
