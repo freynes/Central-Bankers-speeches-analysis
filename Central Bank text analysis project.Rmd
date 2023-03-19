@@ -1,0 +1,176 @@
+```{r setup} 
+knitr::opts_knit$set(root.dir = normalizePath("~/Downloads/replication_20200416-1/txt"))
+```
+
+#Preprocessing of the data
+
+```{r} 
+library(tidyverse)
+library(textdata)
+library(tidytext)
+f <- read_csv("/Users/mohamedlehbib/Downloads/replication_20200416-1/index_manual_2018-05-30.csv")
+
+setwd("~/Downloads/replication_20200416-1/txt")
+Federal_Reserve = f %>%
+        filter(str_detect(description, "Federal Reserve"))
+l <- c("Alan Greenspan", 
+       "Janet L Yellen",
+       "Jerome H Powell",
+       "Ben S Bernanke")
+
+fed_governors <- f %>%
+        filter(author %in% l)
+
+list_of_files <- list.files(path = "~/Downloads/replication_20200416-1/txt",
+                            recursive = TRUE,
+                            pattern = "\\.txt$")
+
+fed_governors <- fed_governors %>%
+        filter(speech != "r010214a")
+
+speech <- fed_governors$speech
+```
+
+#read all the data into R
+
+```{r}
+x <- c()
+y <- c()
+
+for (i in 1:576) {
+         x[i] <- paste(readLines(list_of_files[i]), collapse = " ")
+}
+
+for (i in 1:length(speech)) {
+        y[i] <- paste(read_lines(str_replace_all(paste(speech[i], ".txt"), "\\s+", "")), collapse = " ")
+}
+
+
+```
+
+#Using OpenAI API to summarize any speech
+
+```{r}
+library(openai)
+library(jsonlite)
+
+Sys.setenv(
+    OPENAI_API_KEY = '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'
+)
+
+
+e <- c()
+
+e <- create_completion(
+    model = "text-davinci-003",
+    prompt = paste("Task: Summarize this speech", z),
+    max_tokens = 50,
+    temperature = 0.7,
+    n = 1
+)
+
+```
+
+#function to summarize all speeches at once (make sure that speech is less than 4000 tokens)
+
+```{r}
+w <- c()
+w <- function(i) {
+        z <- c()
+        z=data.frame(text = y[i], stringsAsFactors = F)
+
+        tidy_speech <- z %>%
+                unnest_tokens(word, text)
+        
+        z <- tidy_speech %>%
+                anti_join(stop_words)
+        
+        z <- paste(z, collapse = " ")
+        
+        z <- gsub('"', "", z)
+
+        z <- gsub(",", "", z)
+        
+        return(z)
+}
+
+for (i in 1:length(speech))
+{
+        d <- c()
+        d <- w(i)
+        e[i] <- create_completion
+                (
+                model = "text-davinci-003",
+                prompt = paste("Task: What's the main topic of this speech?: ", d),
+                max_tokens = 50,
+                temperature = 0.7,
+                n = 1
+                )
+}
+
+```
+
+#Analyse the specific address of a governor using OpenAI API:
+
+```{r}
+
+address_summary <- function(governor, date) 
+{
+        #select the governor
+        address <- f %>%
+                filter(author == governor, date_bis == date)
+        
+        z <- data.frame(text = read_lines(str_replace_all(paste(address$speech, ".txt"), "\\s+", "")), stringsAsFactors = F)
+
+        tidy_speech <- z %>%
+                unnest_tokens(word, text)
+        
+        z <- tidy_speech %>%
+                anti_join(stop_words)
+        
+        z <- paste(z, collapse = " ")
+        
+        z <- gsub('"', "", z)
+        
+        z <- gsub(",", "", z)
+
+
+        e <- create_completion(
+            model = "text-davinci-003",
+            prompt = paste("Task: Classify the sentiment in these tweets: ", z),
+            max_tokens = 50,
+            temperature = 0.7,
+            n = 1)
+        
+        return(e$choices$text)
+        
+        
+}
+
+address_summary("Ben S Bernanke", "2006-04-11") #The main topic of this speech is promoting financial literacy and the importance of financial education for the economic future of America's people."
+
+```
+
+#Sentiment analysis
+
+```{r}
+z <- data.frame(text = read_lines(str_replace_all(paste(speech[1], ".txt"), "\\s+", "")), stringsAsFactors = F)
+
+tidy_speech <- z %>%
+        unnest_tokens(word, text)
+
+afinn <- get_sentiments("afinn")
+
+text_sentiments <- tidy_speech %>% 
+  inner_join(afinn)
+
+text_sentiment_scores <- text_sentiments %>% 
+  group_by(word) %>% 
+  summarize(sentiment_score = sum(value))
+
+text_sentiment_scores$sentiment_label <- ifelse(text_sentiment_scores$sentiment_score >= 0, "Positive", "Negative")
+
+ggplot(text_sentiment_scores, aes(x = sentiment_score, fill = sentiment_label)) +
+  geom_histogram(binwidth = 1) +
+  labs(title = "Sentiment Analysis", x = "Sentiment Score", y = "Frequency")
+```
