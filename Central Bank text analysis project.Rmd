@@ -9,7 +9,7 @@ library(tidyverse)
 library(textdata)
 library(tidytext)
 f <- read_csv("/Users/mohamedlehbib/Downloads/replication_20200416-1/index_manual_2018-05-30.csv")
-
+#testing
 setwd("~/Downloads/replication_20200416-1/txt")
 Federal_Reserve = f %>%
         filter(str_detect(description, "Federal Reserve"))
